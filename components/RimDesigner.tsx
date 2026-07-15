@@ -2,13 +2,19 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./RimDesigner.module.css";
-import { DEFAULT_MEASURED_DATA, DEFAULTS, NumericSetting } from "../lib/defaults";
+import {
+  DEFAULT_MEASURED_DATA,
+  DEFAULTS,
+  type NumericSetting,
+} from "../lib/defaults";
 import {
   automaticallyOffsetRun,
   buildModel,
   parseMeasuredData,
   sameXError,
   splitRuns,
+  type ModelParameters,
+  type Point,
 } from "../lib/geometry";
 
 type Values = ModelParameters & {
