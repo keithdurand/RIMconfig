@@ -1,0 +1,23 @@
+:root {
+  color-scheme: dark;
+  --bg: #101114;
+  --panel: #191b20;
+  --panel-2: #22252c;
+  --border: #353943;
+  --text: #f2f3f5;
+  --muted: #a8adb7;
+  --accent: #9e80ff;
+  --measured: #f0a05a;
+  --raw: #72a6c9;
+  --danger: #ff7c7c;
+}
+
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Arial, Helvetica, sans-serif;
+}
+button, input, textarea, select { font: inherit; }
