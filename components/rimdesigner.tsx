@@ -9,7 +9,7 @@ import {
   parseMeasuredData,
   sameXError,
   splitRuns,
-} from "@/lib/geometry";
+} from "../lib/geometry";
 
 type Values = ModelParameters & {
   ballRadius: number;
