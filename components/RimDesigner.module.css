@@ -1,0 +1,180 @@
+.page {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.header {
+  margin-bottom: 18px;
+}
+
+.header h1 {
+  margin: 0 0 5px;
+  font-size: 1.5rem;
+}
+
+.header p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(330px, 430px) minmax(480px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.controls {
+  display: grid;
+  gap: 14px;
+}
+
+.previewColumn {
+  position: sticky;
+  top: 16px;
+  align-self: start;
+}
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  padding: 14px;
+}
+
+.panel h2 {
+  font-size: 1rem;
+  margin: 0 0 12px;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.metric {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 9px;
+}
+
+.metricLabel {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.metricValue {
+  font-size: 1.25rem;
+  margin-top: 3px;
+}
+
+.control {
+  display: grid;
+  grid-template-columns: 125px 1fr 78px;
+  align-items: center;
+  gap: 9px;
+  margin: 8px 0;
+}
+
+.control label {
+  font-size: 0.84rem;
+}
+
+.control input[type="range"] {
+  width: 100%;
+}
+
+.control input[type="number"],
+.select,
+.textarea {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--border);
+  color: var(--text);
+  background: var(--panel-2);
+  border-radius: 7px;
+  padding: 6px 7px;
+}
+
+.select {
+  margin-top: 5px;
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 235px;
+  font-family: Consolas, monospace;
+  line-height: 1.35;
+}
+
+.canvasWrap {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #121419;
+}
+
+.canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin: 9px 0 0;
+}
+
+.status {
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin-top: 8px;
+}
+
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 13px;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+}
+
+.warning {
+  color: var(--danger);
+}
+
+@media (max-width: 1000px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .previewColumn {
+    position: static;
+  }
+}
+
+@media (max-width: 600px) {
+  .page {
+    padding: 10px;
+  }
+
+  .metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .control {
+    grid-template-columns: 1fr 75px;
+  }
+
+  .control label {
+    grid-column: 1 / -1;
+  }
+}
