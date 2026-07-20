@@ -3,14 +3,13 @@ export type Side = "inner" | "outer";
 
 export type ModelParameters = {
   crownDiameter: number;
-  crownZ: number;
   outerDX: number;
   outerDZ: number;
   outerCrownT: number;
   outerEndT: number;
   outerAngle: number;
-  externalBiarcDX: number;
-  externalBiarcDZ: number;
+  externalBiarcEndX: number;
+  externalBiarcEndZ: number;
   externalBiarcRadius: number;
   innerDX: number;
   innerDZ: number;
@@ -193,7 +192,7 @@ export function verticalTangentBiarc(
 }
 
 export function buildModel(p: ModelParameters, samples = 500): Model {
-  const crown = { x: p.crownDiameter / 2, z: p.crownZ };
+  const crown = { x: p.crownDiameter / 2, z: 0 };
   const outerEnd = {
     x: crown.x + p.outerDX,
     z: crown.z - p.outerDZ,
@@ -248,8 +247,8 @@ export function buildModel(p: ModelParameters, samples = 500): Model {
   );
 
   const outerBodyEnd = {
-    x: outerEnd.x + p.externalBiarcDX,
-    z: outerEnd.z + p.externalBiarcDZ,
+    x: p.externalBiarcEndX,
+    z: p.externalBiarcEndZ,
   };
   const externalBiarc = verticalTangentBiarc(
     outerEnd,

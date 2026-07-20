@@ -16,10 +16,11 @@ import {
 type Values = ModelParameters & {
   ballRadius: number;
   splitThreshold: number;
+  measurementZOffset: number;
 };
 
 type RimDesignFile = {
-  schemaVersion: "rim-design-0.1";
+  schemaVersion: "rim-design-0.1" | "rim-design-0.2";
   recordType: "rim-design";
   name: string;
   savedAt: string;
@@ -27,6 +28,7 @@ type RimDesignFile = {
   measurement: {
     ballRadius: number;
     splitThreshold: number;
+    zOffset?: number;
     data: string;
   };
 };
@@ -34,15 +36,15 @@ type RimDesignFile = {
 const INITIAL_VALUES: Values = {
   ballRadius: DEFAULTS.probe.ballRadius.value,
   splitThreshold: DEFAULTS.probe.splitThreshold.value,
+  measurementZOffset: DEFAULTS.probe.zOffset.value,
   crownDiameter: DEFAULTS.crown.diameter.value,
-  crownZ: DEFAULTS.crown.z.value,
   outerDX: DEFAULTS.outer.dx.value,
   outerDZ: DEFAULTS.outer.dz.value,
   outerCrownT: DEFAULTS.outer.crownTangent.value,
   outerEndT: DEFAULTS.outer.endTangent.value,
   outerAngle: DEFAULTS.outer.endAngle.value,
-  externalBiarcDX: DEFAULTS.externalBiarc.dx.value,
-  externalBiarcDZ: DEFAULTS.externalBiarc.dz.value,
+  externalBiarcEndX: DEFAULTS.externalBiarc.endX.value,
+  externalBiarcEndZ: DEFAULTS.externalBiarc.endZ.value,
   externalBiarcRadius: DEFAULTS.externalBiarc.firstRadius.value,
   innerDX: DEFAULTS.inner.dx.value,
   innerDZ: DEFAULTS.inner.dz.value,
@@ -58,14 +60,13 @@ const INITIAL_VALUES: Values = {
 
 const GEOMETRY_KEYS: Array<keyof ModelParameters> = [
   "crownDiameter",
-  "crownZ",
   "outerDX",
   "outerDZ",
   "outerCrownT",
   "outerEndT",
   "outerAngle",
-  "externalBiarcDX",
-  "externalBiarcDZ",
+  "externalBiarcEndX",
+  "externalBiarcEndZ",
   "externalBiarcRadius",
   "innerDX",
   "innerDZ",
@@ -171,9 +172,13 @@ export default function RimDesigner() {
     setValues((previous) => ({ ...previous, [key]: value }));
 
   const parsed = useMemo(() => parseMeasuredData(data), [data]);
+  const offsetMeasuredPoints = useMemo(
+    () => parsed.points.map((point) => ({ ...point, z: point.z + values.measurementZOffset })),
+    [parsed.points, values.measurementZOffset],
+  );
   const allRuns = useMemo(
-    () => splitRuns(parsed.points, values.splitThreshold),
-    [parsed.points, values.splitThreshold],
+    () => splitRuns(offsetMeasuredPoints, values.splitThreshold),
+    [offsetMeasuredPoints, values.splitThreshold],
   );
 
   // Deliberately only use the first two runs. A third top approach is ignored.
@@ -193,7 +198,7 @@ export default function RimDesigner() {
 
   const saveDesign = () => {
     const file: RimDesignFile = {
-      schemaVersion: "rim-design-0.1",
+      schemaVersion: "rim-design-0.2",
       recordType: "rim-design",
       name: designName.trim() || "Untitled rim",
       savedAt: new Date().toISOString(),
@@ -201,6 +206,7 @@ export default function RimDesigner() {
       measurement: {
         ballRadius: values.ballRadius,
         splitThreshold: values.splitThreshold,
+        zOffset: values.measurementZOffset,
         data,
       },
     };
@@ -225,20 +231,36 @@ export default function RimDesigner() {
     try {
       const parsedFile = JSON.parse(await selected.text()) as Partial<RimDesignFile>;
       if (
-        parsedFile.schemaVersion !== "rim-design-0.1" ||
+        (parsedFile.schemaVersion !== "rim-design-0.2" && parsedFile.schemaVersion !== "rim-design-0.1") ||
         parsedFile.recordType !== "rim-design" ||
         !parsedFile.geometry
       ) {
-        throw new Error("This is not a supported rim-design-0.1 file.");
+        throw new Error("This is not a supported rim design file.");
       }
 
       const next = { ...INITIAL_VALUES };
+      const geometry = parsedFile.geometry as ModelParameters & {
+        crownZ?: number;
+        externalBiarcDX?: number;
+        externalBiarcDZ?: number;
+      };
       for (const key of GEOMETRY_KEYS) {
-        const value = parsedFile.geometry[key];
-        if (typeof value !== "number" || !Number.isFinite(value)) {
-          throw new Error(`Invalid geometry value: ${key}`);
+        const value = geometry[key];
+        if (typeof value === "number" && Number.isFinite(value)) next[key] = value;
+      }
+
+      // Migrate rim-design-0.1 files, which stored crown Z and biarc deltas.
+      if (parsedFile.schemaVersion === "rim-design-0.1") {
+        const oldCrownZ = Number.isFinite(geometry.crownZ) ? geometry.crownZ! : 0;
+        next.measurementZOffset = -oldCrownZ;
+        const oldOuterEndX = next.crownDiameter / 2 + next.outerDX;
+        const oldOuterEndZ = oldCrownZ - next.outerDZ;
+        if (Number.isFinite(geometry.externalBiarcDX)) {
+          next.externalBiarcEndX = oldOuterEndX + geometry.externalBiarcDX!;
         }
-        next[key] = value;
+        if (Number.isFinite(geometry.externalBiarcDZ)) {
+          next.externalBiarcEndZ = oldOuterEndZ + geometry.externalBiarcDZ! - oldCrownZ;
+        }
       }
 
       if (parsedFile.measurement) {
@@ -247,6 +269,9 @@ export default function RimDesigner() {
         }
         if (Number.isFinite(parsedFile.measurement.splitThreshold)) {
           next.splitThreshold = parsedFile.measurement.splitThreshold;
+        }
+        if (Number.isFinite(parsedFile.measurement.zOffset)) {
+          next.measurementZOffset = parsedFile.measurement.zOffset!;
         }
         if (typeof parsedFile.measurement.data === "string") {
           setData(parsedFile.measurement.data);
@@ -268,7 +293,7 @@ export default function RimDesigner() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const points = [...model.all, ...parsed.points, ...corrected];
+    const points = [...model.all, ...offsetMeasuredPoints, ...corrected];
     let bounds = getBounds(points);
 
     const width = canvas.width;
@@ -412,7 +437,7 @@ export default function RimDesigner() {
     correctedRuns,
     error.residuals,
     model,
-    parsed.points,
+    offsetMeasuredPoints,
     rawRuns,
     showCorrected,
     showRaw,
@@ -458,6 +483,7 @@ export default function RimDesigner() {
             <h2>Probe data</h2>
             <Slider label="Ball radius" setting={DEFAULTS.probe.ballRadius} value={values.ballRadius} onChange={(v) => update("ballRadius", v)} />
             <Slider label="Run threshold" setting={DEFAULTS.probe.splitThreshold} value={values.splitThreshold} onChange={(v) => update("splitThreshold", v)} />
+            <Slider label="Imported Z offset" setting={DEFAULTS.probe.zOffset} value={values.measurementZOffset} onChange={(v) => update("measurementZOffset", v)} />
             <textarea className={styles.textarea} value={data} onChange={(e) => setData(e.target.value)} spellCheck={false} />
             <div className={styles.status}>
               {parsed.points.length} parsed; {corrected.length} corrected; {ignoredRunPoints} later-run points ignored
@@ -468,7 +494,7 @@ export default function RimDesigner() {
           <div className={styles.panel}>
             <h2>Shared crown</h2>
             <Slider label="Diameter" setting={DEFAULTS.crown.diameter} value={values.crownDiameter} onChange={(v) => update("crownDiameter", v)} />
-            <Slider label="Z" setting={DEFAULTS.crown.z} value={values.crownZ} onChange={(v) => update("crownZ", v)} />
+            <div className={styles.derivedGrid}><span>Z</span><strong>0.0000</strong></div>
           </div>
 
           <div className={styles.panel}>
@@ -482,8 +508,8 @@ export default function RimDesigner() {
 
           <div className={styles.panel}>
             <h2>External biarc</h2>
-            <Slider label="Body ΔX" setting={DEFAULTS.externalBiarc.dx} value={values.externalBiarcDX} onChange={(v) => update("externalBiarcDX", v)} />
-            <Slider label="Body ΔZ" setting={DEFAULTS.externalBiarc.dz} value={values.externalBiarcDZ} onChange={(v) => update("externalBiarcDZ", v)} />
+            <Slider label="End X (radius)" setting={DEFAULTS.externalBiarc.endX} value={values.externalBiarcEndX} onChange={(v) => update("externalBiarcEndX", v)} />
+            <Slider label="End Z" setting={DEFAULTS.externalBiarc.endZ} value={values.externalBiarcEndZ} onChange={(v) => update("externalBiarcEndZ", v)} />
             <Slider label="First radius" setting={DEFAULTS.externalBiarc.firstRadius} value={values.externalBiarcRadius} onChange={(v) => update("externalBiarcRadius", v)} />
             <div className={styles.derivedGrid}>
               <span>Second radius</span>
