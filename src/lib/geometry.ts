@@ -9,17 +9,45 @@ export type ModelParameters = {
   outerCrownT: number;
   outerEndT: number;
   outerAngle: number;
+  externalBiarcDX: number;
+  externalBiarcDZ: number;
+  externalBiarcRadius: number;
   innerDX: number;
   innerDZ: number;
   innerCrownT: number;
   innerEndT: number;
   innerAngle: number;
+  junctionDX: number;
+  junctionDZ: number;
+  junctionStartT: number;
+  junctionEndT: number;
+  junctionEndAngle: number;
+};
+
+export type Biarc = {
+  start: Point;
+  meeting: Point;
+  end: Point;
+  center1: Point;
+  center2: Point;
+  radius1: number;
+  radius2: number;
+  first: Point[];
+  second: Point[];
+  all: Point[];
+  valid: boolean;
 };
 
 export type Model = {
   crown: Point;
+  innerEnd: Point;
+  outerEnd: Point;
+  junctionEnd: Point;
+  outerBodyEnd: Point;
   inner: Point[];
   outer: Point[];
+  junction: Point[];
+  externalBiarc: Biarc;
   all: Point[];
 };
 
@@ -43,6 +71,127 @@ export function hermite(
   };
 }
 
+function sampleHermite(
+  p0: Point,
+  p1: Point,
+  m0: Point,
+  m1: Point,
+  samples: number,
+): Point[] {
+  const points: Point[] = [];
+  for (let i = 0; i <= samples; i += 1) {
+    points.push(hermite(p0, p1, m0, m1, i / samples));
+  }
+  return points;
+}
+
+function normalizeAngle(angle: number): number {
+  let result = angle % (Math.PI * 2);
+  if (result < 0) result += Math.PI * 2;
+  return result;
+}
+
+function sampleArc(
+  center: Point,
+  radius: number,
+  start: Point,
+  end: Point,
+  clockwise: boolean,
+  samples: number,
+): Point[] {
+  const a0 = Math.atan2(start.z - center.z, start.x - center.x);
+  const a1 = Math.atan2(end.z - center.z, end.x - center.x);
+  let sweep: number;
+
+  if (clockwise) {
+    sweep = -normalizeAngle(a0 - a1);
+  } else {
+    sweep = normalizeAngle(a1 - a0);
+  }
+
+  return Array.from({ length: samples + 1 }, (_, index) => {
+    const angle = a0 + sweep * (index / samples);
+    return {
+      x: center.x + radius * Math.cos(angle),
+      z: center.z + radius * Math.sin(angle),
+    };
+  });
+}
+
+/**
+ * Connect two points with externally tangent, opposite-curvature arcs.
+ * Both endpoint tangents are parallel to Z. The first radius is supplied;
+ * the second radius and meeting point are derived exactly.
+ */
+export function verticalTangentBiarc(
+  start: Point,
+  end: Point,
+  radius1: number,
+  samplesPerArc = 120,
+): Biarc {
+  const dx = end.x - start.x;
+  const dz = end.z - start.z;
+  const side = Math.sign(dx) || 1;
+  const radiusSum = (dx * dx + dz * dz) / (2 * Math.abs(dx || Number.EPSILON));
+  const radius2 = radiusSum - radius1;
+  const valid = Number.isFinite(radius2) && radius1 > 0 && radius2 > 0 && Math.abs(dx) > 1e-9;
+
+  if (!valid) {
+    return {
+      start,
+      meeting: start,
+      end,
+      center1: start,
+      center2: end,
+      radius1,
+      radius2,
+      first: [start, end],
+      second: [],
+      all: [start, end],
+      valid: false,
+    };
+  }
+
+  const center1 = { x: start.x + side * radius1, z: start.z };
+  const center2 = { x: end.x - side * radius2, z: end.z };
+  const fraction = radius1 / radiusSum;
+  const meeting = {
+    x: center1.x + fraction * (center2.x - center1.x),
+    z: center1.z + fraction * (center2.z - center1.z),
+  };
+
+  // Select the short arc from each endpoint to the external-tangency point.
+  const candidates1 = [
+    sampleArc(center1, radius1, start, meeting, true, samplesPerArc),
+    sampleArc(center1, radius1, start, meeting, false, samplesPerArc),
+  ];
+  const candidates2 = [
+    sampleArc(center2, radius2, meeting, end, true, samplesPerArc),
+    sampleArc(center2, radius2, meeting, end, false, samplesPerArc),
+  ];
+  const length = (points: Point[]) =>
+    points.slice(1).reduce(
+      (sum, point, index) => sum + Math.hypot(point.x - points[index].x, point.z - points[index].z),
+      0,
+    );
+  const first = length(candidates1[0]) <= length(candidates1[1]) ? candidates1[0] : candidates1[1];
+  const second = length(candidates2[0]) <= length(candidates2[1]) ? candidates2[0] : candidates2[1];
+
+  return {
+    start,
+    meeting,
+    end,
+    center1,
+    center2,
+    radius1,
+    radius2,
+    first,
+    second,
+    all: [...first, ...second.slice(1)],
+    valid: true,
+  };
+}
+
 export function buildModel(p: ModelParameters, samples = 500): Model {
   const crown = { x: p.crownDiameter / 2, z: p.crownZ };
   const outerEnd = {
@@ -56,45 +205,74 @@ export function buildModel(p: ModelParameters, samples = 500): Model {
 
   const outerAngle = (p.outerAngle * Math.PI) / 180;
   const innerAngle = (p.innerAngle * Math.PI) / 180;
+  const junctionEndAngle = (p.junctionEndAngle * Math.PI) / 180;
 
-  const outer: Point[] = [];
-  const inner: Point[] = [];
+  const outer = sampleHermite(
+    crown,
+    outerEnd,
+    { x: p.outerCrownT, z: 0 },
+    {
+      x: Math.cos(outerAngle) * p.outerEndT,
+      z: -Math.sin(outerAngle) * p.outerEndT,
+    },
+    samples,
+  );
 
-  for (let i = 0; i <= samples; i += 1) {
-    const t = i / samples;
+  const inner = sampleHermite(
+    crown,
+    innerEnd,
+    { x: -p.innerCrownT, z: 0 },
+    {
+      x: -Math.cos(innerAngle) * p.innerEndT,
+      z: -Math.sin(innerAngle) * p.innerEndT,
+    },
+    samples,
+  );
 
-    outer.push(
-      hermite(
-        crown,
-        outerEnd,
-        { x: p.outerCrownT, z: 0 },
-        {
-          x: Math.cos(outerAngle) * p.outerEndT,
-          z: -Math.sin(outerAngle) * p.outerEndT,
-        },
-        t,
-      ),
-    );
+  const junctionEnd = {
+    x: innerEnd.x - p.junctionDX,
+    z: innerEnd.z - p.junctionDZ,
+  };
+  const junction = sampleHermite(
+    innerEnd,
+    junctionEnd,
+    {
+      x: -Math.cos(innerAngle) * p.junctionStartT,
+      z: -Math.sin(innerAngle) * p.junctionStartT,
+    },
+    {
+      x: -Math.cos(junctionEndAngle) * p.junctionEndT,
+      z: -Math.sin(junctionEndAngle) * p.junctionEndT,
+    },
+    samples,
+  );
 
-    inner.push(
-      hermite(
-        crown,
-        innerEnd,
-        { x: -p.innerCrownT, z: 0 },
-        {
-          x: -Math.cos(innerAngle) * p.innerEndT,
-          z: -Math.sin(innerAngle) * p.innerEndT,
-        },
-        t,
-      ),
-    );
-  }
+  const outerBodyEnd = {
+    x: outerEnd.x + p.externalBiarcDX,
+    z: outerEnd.z + p.externalBiarcDZ,
+  };
+  const externalBiarc = verticalTangentBiarc(
+    outerEnd,
+    outerBodyEnd,
+    p.externalBiarcRadius,
+  );
 
   return {
     crown,
+    innerEnd,
+    outerEnd,
+    junctionEnd,
+    outerBodyEnd,
     inner,
     outer,
-    all: [...inner.slice().reverse(), ...outer.slice(1)],
+    junction,
+    externalBiarc,
+    all: [
+      ...junction.slice().reverse(),
+      ...inner.slice(0, -1).reverse(),
+      ...outer.slice(1),
+      ...externalBiarc.all.slice(1),
+    ],
   };
 }
 

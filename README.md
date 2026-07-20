@@ -1,57 +1,40 @@
 # Horn Rim Visualizer
 
-Internal development tool for comparing a two-Hermite-spline rim model with
-measured 3 mm probe-ball centre data.
+Internal rim design tool built around two Hermite rim splines, an internal
+junction spline, and an exact two-arc external transition.
+
+## Current design model
+
+- Shared crown point
+- Outer rim Hermite spline
+- External biarc with Z-parallel endpoint tangents
+  - first radius is stored
+  - second radius and meeting point are calculated
+- Inner rim Hermite spline
+- Internal junction Hermite spline
+  - starts tangent to the inner rim spline
+
+The model remains in ordinary radial X coordinates. Diameter conversion and
+machine-code generation belong in the later export stage.
+
+## Save and open
+
+`Save` downloads a `*.rim.json` file using schema `rim-design-0.1`.
+The file stores native geometry parameters and optional probe-comparison data;
+it does not store sampled points.
+
+`Open` restores one of these JSON files.
 
 ## Run locally
 
 ```bash
-npm install
+npm install --include=dev
 npm run dev
 ```
 
 Open http://localhost:3000.
 
-## Set your defaults
+## Set defaults
 
-Edit `src/lib/defaults.ts`.
-
-Each control has:
-
-- `value`: startup value
-- `min`
-- `max`
-- `step`
-
-The preview is sticky on desktop. Measurement input and controls scroll beside it.
-
-## Measurement format
-
-The parser accepts:
-
-```text
-X6.766 Z-4.000
-X6.768 Z-3.990
-```
-
-It also accepts `X,Z`, spaces, tabs, or semicolons.
-
-The first two detected runs are used. Later runs are ignored. The probe centre
-traces are offset by the configured ball radius.
-
-## Error calculation
-
-RMS and maximum error are calculated only for corrected measurement points:
-
-- whose X coordinate lies inside the corresponding spline branch;
-- for which the spline branch can be evaluated at that same X.
-
-The nearest point on the entire curve is deliberately not used.
-
-## Deploy
-
-Push the folder to GitHub and import the repository into Vercel, or run:
-
-```bash
-npx vercel
-```
+Edit `src/lib/defaults.ts`. Each numeric control has a startup value, minimum,
+maximum, and step.
