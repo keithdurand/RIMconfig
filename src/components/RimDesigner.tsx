@@ -51,8 +51,8 @@ const INITIAL_VALUES: Values = {
   innerCrownT: DEFAULTS.inner.crownTangent.value,
   innerEndT: DEFAULTS.inner.endTangent.value,
   innerAngle: DEFAULTS.inner.endAngle.value,
-  junctionDX: DEFAULTS.internalJunction.dx.value,
-  junctionDZ: DEFAULTS.internalJunction.dz.value,
+  junctionEndX: DEFAULTS.internalJunction.endX.value,
+  junctionEndZ: DEFAULTS.internalJunction.endZ.value,
   junctionStartT: DEFAULTS.internalJunction.startTangent.value,
   junctionEndT: DEFAULTS.internalJunction.endTangent.value,
   junctionEndAngle: DEFAULTS.internalJunction.endAngle.value,
@@ -73,8 +73,8 @@ const GEOMETRY_KEYS: Array<keyof ModelParameters> = [
   "innerCrownT",
   "innerEndT",
   "innerAngle",
-  "junctionDX",
-  "junctionDZ",
+  "junctionEndX",
+  "junctionEndZ",
   "junctionStartT",
   "junctionEndT",
   "junctionEndAngle",
@@ -243,10 +243,22 @@ export default function RimDesigner() {
         crownZ?: number;
         externalBiarcDX?: number;
         externalBiarcDZ?: number;
+        junctionDX?: number;
+        junctionDZ?: number;
       };
       for (const key of GEOMETRY_KEYS) {
         const value = geometry[key];
         if (typeof value === "number" && Number.isFinite(value)) next[key] = value;
+      }
+
+      // Older files stored the junction endpoint as inward/downward deltas.
+      const oldInnerEndX = next.crownDiameter / 2 - next.innerDX;
+      const oldInnerEndZ = -next.innerDZ;
+      if (Number.isFinite(geometry.junctionDX)) {
+        next.junctionEndX = oldInnerEndX - geometry.junctionDX!;
+      }
+      if (Number.isFinite(geometry.junctionDZ)) {
+        next.junctionEndZ = oldInnerEndZ - geometry.junctionDZ!;
       }
 
       // Migrate rim-design-0.1 files, which stored crown Z and biarc deltas.
@@ -539,8 +551,8 @@ export default function RimDesigner() {
 
           <div className={styles.panel}>
             <h2>Internal junction spline</h2>
-            <Slider label="Inward ΔX" setting={DEFAULTS.internalJunction.dx} value={values.junctionDX} onChange={(v) => update("junctionDX", v)} />
-            <Slider label="Down ΔZ" setting={DEFAULTS.internalJunction.dz} value={values.junctionDZ} onChange={(v) => update("junctionDZ", v)} />
+            <Slider label="End X (radius)" setting={DEFAULTS.internalJunction.endX} value={values.junctionEndX} onChange={(v) => update("junctionEndX", v)} />
+            <Slider label="End Z" setting={DEFAULTS.internalJunction.endZ} value={values.junctionEndZ} onChange={(v) => update("junctionEndZ", v)} />
             <Slider label="Start tangent" setting={DEFAULTS.internalJunction.startTangent} value={values.junctionStartT} onChange={(v) => update("junctionStartT", v)} />
             <Slider label="End tangent" setting={DEFAULTS.internalJunction.endTangent} value={values.junctionEndT} onChange={(v) => update("junctionEndT", v)} />
             <Slider label="End angle" setting={DEFAULTS.internalJunction.endAngle} value={values.junctionEndAngle} onChange={(v) => update("junctionEndAngle", v)} />

@@ -36,9 +36,9 @@ export const DEFAULTS = {
     endAngle: { value: 78, min: 60, max: 100, step: 0.1 },
   },
   internalJunction: {
-    // Positive values move inward and downward from the inner-rim endpoint.
-    dx: { value: 2.0, min: 0.1, max: 5, step: 0.01 },
-    dz: { value: 2.5, min: 0.1, max: 8, step: 0.01 },
+    // Absolute endpoint in radial X/Z design coordinates.
+    endX: { value: 6.75, min: 3, max: 10, step: 0.01 },
+    endZ: { value: -4.0, min: -10, max: -0.1, step: 0.01 },
     startTangent: { value: 2.5, min: 0.01, max: 8, step: 0.01 },
     endTangent: { value: 3.0, min: 0.01, max: 10, step: 0.01 },
     endAngle: { value: 78, min: 60, max: 90, step: 0.1 },

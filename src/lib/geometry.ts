@@ -16,8 +16,8 @@ export type ModelParameters = {
   innerCrownT: number;
   innerEndT: number;
   innerAngle: number;
-  junctionDX: number;
-  junctionDZ: number;
+  junctionEndX: number;
+  junctionEndZ: number;
   junctionStartT: number;
   junctionEndT: number;
   junctionEndAngle: number;
@@ -229,8 +229,8 @@ export function buildModel(p: ModelParameters, samples = 500): Model {
   );
 
   const junctionEnd = {
-    x: innerEnd.x - p.junctionDX,
-    z: innerEnd.z - p.junctionDZ,
+    x: p.junctionEndX,
+    z: p.junctionEndZ,
   };
   const junction = sampleHermite(
     innerEnd,
