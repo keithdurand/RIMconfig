@@ -37,8 +37,8 @@ export const DEFAULTS = {
   },
   internalJunction: {
     // Absolute endpoint in radial X/Z design coordinates.
-    endX: { value: 6.75, min: 3, max: 10, step: 0.01 },
-    endZ: { value: -4.0, min: -10, max: -0.1, step: 0.01 },
+    endX: { value: 8.375, min: 8, max: 9, step: 0.005 },
+    endZ: { value: -3.5, min: -6, max: -2, step: 0.01 },
     startTangent: { value: 2.5, min: 0.01, max: 8, step: 0.01 },
     endTangent: { value: 3.0, min: 0.01, max: 10, step: 0.01 },
     endAngle: { value: 78, min: 60, max: 90, step: 0.1 },
